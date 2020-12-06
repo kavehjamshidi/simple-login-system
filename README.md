@@ -1,2 +1,2 @@
 # simple-login-system
-A simple login system using Nodejs, Express, MongoDB, bcrypt, and JWT. 
+A simple token-based authentication and authorization system using Nodejs, Express, MongoDB, bcrypt, and JWT. 
