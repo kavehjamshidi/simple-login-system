@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const app = require('./app');
+const logger = require('./utils/logger');
 
 mongoose
   .connect(process.env.DB_URI, {
@@ -8,7 +9,7 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log('connected to db.'));
+  .then(() => logger.info('connected to db.'));
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`listening on port ${port}`));
+app.listen(port, () => logger.info(`listening on port ${port}`));
