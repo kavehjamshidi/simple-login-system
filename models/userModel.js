@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const AppError = require('../utils/appError');
 
 //RegEx for testing passwords to have at least eight characters containing at least one uppercase letter, one lowercase letter, one number, and one symbol.
-const passwordRegEx = /(?=.{8,})(?=.*[A-Z])(?=.*[a-z])(?=.*[1-9])(?=.*[-~@#$%^&*()_=+`|{}'".,:;?<>\\/[\]])/;
+const passwordRegEx = /(?=.{8,})(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[-~!@#$%^&*()_=+`|{}'".,:;?<>\\/[\]])/;
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -44,9 +45,9 @@ const userSchema = new mongoose.Schema({
       message: 'Passwords do not match.',
     },
   },
-  passwordChangeDate: {
-    type: Date,
-  },
+  passwordChangeDate: Date,
+  passwordResetToken: String,
+  passwordResetExpired: Date,
 });
 
 userSchema.post('validate', function (err, doc, next) {
@@ -57,6 +58,7 @@ userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   this.password = await bcrypt.hash(this.password, 12);
+  this.passwordChangeDate = Date.now() - 1000; // A one second error margin for letting data to be saved on database.
   this.confirmPassword = undefined;
   next();
 });
@@ -70,6 +72,17 @@ userSchema.methods.changedPasswordAfterToken = function (JWTTimeStamp) {
     return this.passwordChangeDate.getTime() > 1000 * JWTTimeStamp;
 
   return false;
+};
+
+userSchema.methods.createPasswordResetToken = function () {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+  this.passwordResetExpired = Date.now() + 15 * 60 * 1000;
+
+  return resetToken;
 };
 
 const User = mongoose.model('user', userSchema);
