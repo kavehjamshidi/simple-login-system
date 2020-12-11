@@ -81,5 +81,7 @@ module.exports.protect = catchAsyncError(async (req, res, next) => {
       new AppError('Login credentials have changed. Please login again.', 401)
     );
 
+  // For other middlewares, mainly authorization.
+  req.user = user;
   next();
 });
