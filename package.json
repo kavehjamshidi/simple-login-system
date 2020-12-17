@@ -2,9 +2,9 @@
   "name": "simple-login-system",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --coverage --watchAll --runInBand --config ./jest.config.js"
   },
   "keywords": [],
   "author": "Kaveh Jamshidi",
