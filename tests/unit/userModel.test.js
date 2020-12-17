@@ -9,8 +9,13 @@ const {
 const AppError = require('../../utils/appError');
 
 describe('createValidationError hook', () => {
+  let next;
+
+  beforeEach(() => {
+    next = jest.fn();
+  });
+
   it('should create an app error and call next with it if there is an error', () => {
-    const next = jest.fn();
     const err = new Error('A fake error');
 
     createValidationError(err, undefined, next);
@@ -23,7 +28,6 @@ describe('createValidationError hook', () => {
   });
 
   it('should call next with no arguments if there is no error', () => {
-    const next = jest.fn();
     createValidationError(undefined, undefined, next);
 
     expect(next).toBeCalledTimes(1);
@@ -33,13 +37,18 @@ describe('createValidationError hook', () => {
 });
 
 describe('hashPassword', () => {
-  it('should hash password if password is modified', async () => {
-    const next = jest.fn();
-    const thisArg = {
+  let next;
+  let thisArg;
+  beforeEach(() => {
+    next = jest.fn();
+    thisArg = {
       isModified: jest.fn(),
       password: '123456',
       confirmPassword: '123456',
     };
+  });
+
+  it('should hash password if password is modified', async () => {
     thisArg.isModified.mockReturnValueOnce(true);
     await hashPassword.call(thisArg, next);
 
@@ -51,11 +60,6 @@ describe('hashPassword', () => {
   });
 
   it('should call next if password not modified', async () => {
-    const next = jest.fn();
-    const thisArg = {
-      isModified: jest.fn(),
-      password: '123456',
-    };
     thisArg.isModified.mockReturnValueOnce(false);
     await hashPassword.call(thisArg, next);
 
@@ -110,19 +114,20 @@ describe('passwordRegExTest', () => {
 });
 
 describe('validateConfirmPassword', () => {
-  it('should return false if password and confirm password fields do not match', () => {
-    const thisArg = {
+  let thisArg;
+  beforeEach(() => {
+    thisArg = {
       password: '123456',
     };
+  });
+
+  it('should return false if password and confirm password fields do not match', () => {
     const result = validateConfirmPassword.call(thisArg, '12345');
 
     expect(result).toBe(false);
   });
 
   it('should return true if password and confirm password fields match', () => {
-    const thisArg = {
-      password: '123456',
-    };
     const result = validateConfirmPassword.call(thisArg, '123456');
 
     expect(result).toBe(true);
