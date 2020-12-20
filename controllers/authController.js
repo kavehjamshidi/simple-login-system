@@ -40,13 +40,13 @@ module.exports.login = catchAsyncError(async (req, res, next) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return next(new AppError('Please provide email and password.', 400));
+    return next(new AppError('Please enter email and password.', 400));
   }
 
   const user = await User.findOne({ username });
 
   if (!user || !(await user.comparePassword(password))) {
-    return next(new AppError('Incorrect username or password.', 401));
+    return next(new AppError('Invalid username or password.', 401));
   }
 
   const token = signToken(user._id);
@@ -76,7 +76,7 @@ module.exports.protect = catchAsyncError(async (req, res, next) => {
   );
 
   const user = await User.findById(decodedPayload.id);
-  if (!user) return next(new AppError('The user no longer exists', 401));
+  if (!user) return next(new AppError('The user no longer exists.', 401));
 
   if (user.changedPasswordAfterToken(decodedPayload.iat))
     return next(
@@ -89,7 +89,12 @@ module.exports.protect = catchAsyncError(async (req, res, next) => {
 });
 
 module.exports.forgotPassword = catchAsyncError(async (req, res, next) => {
-  const user = await User.findOne({ email: req.body.email });
+  const { email } = req.body;
+  if (!email) {
+    return next(new AppError('Please enter your email.', 400));
+  }
+
+  const user = await User.findOne({ email });
   if (!user)
     return next(new AppError('No user found with the provided email.', 404));
 
@@ -132,12 +137,14 @@ module.exports.resetPassword = catchAsyncError(async (req, res, next) => {
     passwordResetToken: hashedToken,
     passwordResetExpired: { $gt: Date.now() },
   });
-  if (!user) return next(new AppError('Invalid token', 400));
 
-  user.password = req.body.password;
-  user.confirmPassword = req.body.confirmPassword;
+  if (!user) return next(new AppError('Invalid token.', 400));
+
   user.passwordResetToken = undefined;
   user.passwordResetExpired = undefined;
+  user.password = req.body.password;
+  user.confirmPassword = req.body.confirmPassword;
+
   await user.save();
 
   return res.status(200).json({

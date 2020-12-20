@@ -6,14 +6,22 @@ function handleJWTError() {
 }
 
 function handleJWTExpiredError() {
-  return new AppError('You token has expired. Please login again.', 401);
+  return new AppError('Your token has expired. Please login again.', 401);
+}
+
+function handleMongooseDuplicateError(field) {
+  return new AppError(`An account with this ${field} already exists.`, 400);
 }
 
 module.exports = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
 
-  if (err.name === 'JsonWebToken') err = handleJWTError();
+  if (err.name === 'JsonWebToken' || err.name === 'JsonWebTokenError')
+    err = handleJWTError();
   if (err.name === 'TokenExpiredError') err = handleJWTExpiredError();
+  if (err.code === 11000) {
+    err = handleMongooseDuplicateError(...Object.keys(err.keyPattern));
+  }
 
   logger.error(err.message, err);
 

@@ -134,52 +134,58 @@ describe('validateConfirmPassword', () => {
   });
 });
 
-describe('comparePassword method', () => {
-  it('should return false if the password and the hashed password does not match', async () => {
+describe('Document methods', () => {
+  let user;
+  beforeEach(async () => {
     const hashedPassword = await bcrypt.hash('123456', 12);
-    const user = new User({ password: hashedPassword });
-    const result = await user.comparePassword('12345');
-
-    expect(result).toBe(false);
+    user = new User({
+      password: hashedPassword,
+      passwordChangeDate: new Date(),
+    });
   });
 
-  it('should return true if the password and the hashed password match', async () => {
-    const hashedPassword = await bcrypt.hash('123456', 12);
-    const user = new User({ password: hashedPassword });
-    const result = await user.comparePassword('123456');
+  describe('comparePassword method', () => {
+    it('should return false if the password and the hashed password does not match', async () => {
+      const result = await user.comparePassword('12345');
 
-    expect(result).toBe(true);
-  });
-});
+      expect(result).toBe(false);
+    });
 
-describe('changedPasswordAfterToken method', () => {
-  it('should return true if password was changed after the token had been issued', () => {
-    const user = new User({ passwordChangeDate: new Date() });
-    const tokenIssuedTimestamp = user.passwordChangeDate.getTime() / 1000 - 10;
-    const result = user.changedPasswordAfterToken(tokenIssuedTimestamp);
+    it('should return true if the password and the hashed password match', async () => {
+      const result = await user.comparePassword('123456');
 
-    expect(result).toBe(true);
+      expect(result).toBe(true);
+    });
   });
 
-  it('should return false if password was not changed after the token had been issued', () => {
-    const user = new User({ passwordChangeDate: new Date() });
-    const tokenIssuedTimestamp = user.passwordChangeDate.getTime() / 1000 + 10;
-    const result = user.changedPasswordAfterToken(tokenIssuedTimestamp);
+  describe('changedPasswordAfterToken method', () => {
+    it('should return true if password was changed after the token had been issued', () => {
+      const tokenIssuedTimestamp =
+        user.passwordChangeDate.getTime() / 1000 - 10;
+      const result = user.changedPasswordAfterToken(tokenIssuedTimestamp);
 
-    expect(result).toBe(false);
+      expect(result).toBe(true);
+    });
+
+    it('should return false if password was not changed after the token had been issued', () => {
+      const tokenIssuedTimestamp =
+        user.passwordChangeDate.getTime() / 1000 + 10;
+      const result = user.changedPasswordAfterToken(tokenIssuedTimestamp);
+
+      expect(result).toBe(false);
+    });
   });
-});
 
-describe('createPasswordResetToken', () => {
-  it('should create password reset token and its expiry date', () => {
-    const user = new User();
-    const resetToken = user.createPasswordResetToken();
+  describe('createPasswordResetToken', () => {
+    it('should create password reset token and its expiry date', () => {
+      const resetToken = user.createPasswordResetToken();
 
-    expect(resetToken).toBeTruthy();
-    expect(user).toHaveProperty('passwordResetToken');
-    expect(user).toHaveProperty('passwordResetExpired');
-    expect(user.passwordResetExpired.getTime()).toBeLessThanOrEqual(
-      Date.now() + 15 * 60 * 1000
-    );
+      expect(resetToken).toBeTruthy();
+      expect(user).toHaveProperty('passwordResetToken');
+      expect(user).toHaveProperty('passwordResetExpired');
+      expect(user.passwordResetExpired.getTime()).toBeLessThanOrEqual(
+        Date.now() + 15 * 60 * 1000
+      );
+    });
   });
 });

@@ -47,7 +47,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: [true, 'Password is required.'],
     validate: [
       passwordRegExTest,
       'Password should have at least eight characters containing at least one uppercase letter, one lowercase letter, one number, and one symbol.',
@@ -55,7 +55,7 @@ const userSchema = new mongoose.Schema({
   },
   confirmPassword: {
     type: String,
-    required: [true, 'Enter your password again'],
+    required: [true, 'Enter your password again.'],
     validate: [validateConfirmPassword, 'Passwords do not match.'],
   },
   passwordChangeDate: Date,
