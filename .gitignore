@@ -1,2 +1,5 @@
 node_modules
 *.env
+logfile.log
+coverage
+test-log.log
