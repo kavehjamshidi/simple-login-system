@@ -20,7 +20,10 @@ describe('Error middleware', () => {
     expect(res.status).toBeCalledWith(500);
     expect(res.status(500).json).toBeCalledTimes(1);
     expect(res.status(500).json).toBeCalledWith(
-      expect.objectContaining({ status: 'error', message: 'fake error' })
+      expect.objectContaining({
+        status: 'error',
+        message: 'Something went wrong.',
+      })
     );
   });
 

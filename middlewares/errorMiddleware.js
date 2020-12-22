@@ -19,15 +19,16 @@ module.exports = (err, req, res, next) => {
   if (err.name === 'JsonWebToken' || err.name === 'JsonWebTokenError')
     err = handleJWTError();
   if (err.name === 'TokenExpiredError') err = handleJWTExpiredError();
-  if (err.code === 11000) {
+  if (err.code === 11000)
     err = handleMongooseDuplicateError(...Object.keys(err.keyPattern));
-  }
 
   logger.error(err.message, err);
+
+  if (err.statusCode === 500 && !(err instanceof AppError))
+    err.message = 'Something went wrong.';
 
   return res.status(err.statusCode).json({
     status: 'error',
     message: err.message,
-    stack: err.stack,
   });
 };
