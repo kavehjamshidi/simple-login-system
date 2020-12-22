@@ -1,6 +1,12 @@
 require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+
 const logger = require('./utils/logger');
 const userRoutes = require('./routes/userRoutes');
 const sampleProtectedRoute = require('./routes/sampleProtectedRoute');
@@ -21,7 +27,19 @@ mongoose
 
 const app = express();
 
-app.use(express.json());
+// Security Headers
+app.use(helmet());
+
+// Body Parser / Cookie Parser
+app.use(express.json({ limit: '10kb' }));
+app.use(cookieParser());
+
+// NoSQL query injection
+app.use(mongoSanitize());
+
+// XSS protection
+app.use(xss());
+
 app.use('/user', userRoutes);
 app.use('/sample-route', sampleProtectedRoute);
 app.all('*', notFoundController);

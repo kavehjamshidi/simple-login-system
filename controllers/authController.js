@@ -12,6 +12,14 @@ function signToken(id) {
   });
 }
 
+const cookieOptions = {
+  expires: new Date(
+    Date.now() + process.env.JWT_COOKIE_EXPIRATION * 24 * 60 * 60 * 1000
+  ),
+  httpOnly: true,
+};
+if (process.env.NODE_ENV === 'production') cookieOptions.secure = true;
+
 module.exports.signUp = catchAsyncError(async (req, res) => {
   let newUser = await User.create({
     username: req.body.username,
@@ -27,9 +35,9 @@ module.exports.signUp = catchAsyncError(async (req, res) => {
     email: newUser.email,
   };
 
+  res.cookie('jwt', token, cookieOptions);
   return res.status(201).json({
     status: 'success',
-    token,
     data: {
       user: newUser,
     },
@@ -50,22 +58,15 @@ module.exports.login = catchAsyncError(async (req, res, next) => {
   }
 
   const token = signToken(user._id);
+
+  res.cookie('jwt', token, cookieOptions);
   return res.status(200).json({
     status: 'success',
-    token,
   });
 });
 
 module.exports.protect = catchAsyncError(async (req, res, next) => {
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-
+  const token = req.cookies.jwt;
   if (!token) {
     return next(new AppError('You are not logged in.', 401));
   }
