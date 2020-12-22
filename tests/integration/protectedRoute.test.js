@@ -2,11 +2,19 @@ const request = require('supertest');
 const app = require('../../app');
 const { User } = require('../../models/userModel');
 
+const prepareCookies = (res) => {
+  const re = new RegExp('; path=/; httponly', 'gi');
+  return res.headers['set-cookie']
+    .map(function (cookie) {
+      return cookie.replace(re, '');
+    })
+    .join('; ');
+};
+
 describe('Sample protected route', () => {
   describe('/sample-route', () => {
     let server;
-    let token;
-    let authHeader;
+    let cookies;
     beforeEach(async () => {
       server = app.listen(process.env.PORT || 3030);
       const res = await request(server).post('/user/signup').send({
@@ -15,8 +23,7 @@ describe('Sample protected route', () => {
         password: '12345Ab!',
         confirmPassword: '12345Ab!',
       });
-      ({ token } = res.body);
-      authHeader = `Bearer ${token}`;
+      cookies = prepareCookies(res);
     });
     afterEach(async () => {
       server.close();
@@ -24,9 +31,7 @@ describe('Sample protected route', () => {
     });
 
     const happyPath = () => {
-      return request(server)
-        .get('/sample-route')
-        .set('authorization', authHeader);
+      return request(server).get('/sample-route').set('Cookie', cookies);
     };
 
     it('should let user access the protected route', async () => {
@@ -41,8 +46,8 @@ describe('Sample protected route', () => {
       );
     });
 
-    it('should throw 401 if no auth header', async () => {
-      authHeader = '';
+    it('should throw 401 if no jwt cookie', async () => {
+      cookies = '';
       const res = await happyPath();
 
       expect(res.status).toBe(401);
@@ -51,19 +56,8 @@ describe('Sample protected route', () => {
       expect(res.body).toHaveProperty('message', 'You are not logged in.');
     });
 
-    it('should throw 401 if no token in auth header', async () => {
-      authHeader = 'Bearer';
-      const res = await happyPath();
-
-      expect(res.status).toBe(401);
-      expect(res.header['content-type']).toMatch(/json/);
-      expect(res.body).toHaveProperty('status', 'error');
-      expect(res.body).toHaveProperty('message', 'You are not logged in.');
-    });
-
-    it('should throw 401 if token is invalid', async () => {
-      authHeader = 'Bearer 123';
-
+    it('should throw 401 if jwt token is invalid', async () => {
+      cookies = 'jwt=123554;';
       const res = await happyPath();
 
       expect(res.status).toBe(401);
