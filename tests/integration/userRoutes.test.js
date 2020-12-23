@@ -343,6 +343,7 @@ describe('user routes', () => {
     });
 
     it('should throw 500 if could not send email', async () => {
+      const temp = process.env.EMAIL_HOST;
       process.env.EMAIL_HOST = '';
       const res = await happyPath();
       const user = User.findOne({ email });
@@ -356,7 +357,7 @@ describe('user routes', () => {
       );
       expect(user.passwordResetToken).toBe(undefined);
       expect(user.passwordResetExpired).toBe(undefined);
-      process.env.EMAIL_HOST = 'smtp.mailtrap.io';
+      process.env.EMAIL_HOST = temp;
     });
   });
 
