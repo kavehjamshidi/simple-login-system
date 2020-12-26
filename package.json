@@ -4,6 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
+    "start": "node server",
     "test": "jest --coverage --watchAll --runInBand --config ./jest.config.js"
   },
   "keywords": [],
