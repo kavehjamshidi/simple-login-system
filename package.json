@@ -7,6 +7,9 @@
     "start": "node server",
     "test": "jest --coverage --watchAll --runInBand --config ./jest.config.js"
   },
+  "engines": {
+    "node": "12.19.0"
+  },
   "keywords": [],
   "author": "Kaveh Jamshidi",
   "license": "MIT",
