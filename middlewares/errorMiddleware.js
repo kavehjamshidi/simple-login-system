@@ -14,8 +14,6 @@ function handleMongooseDuplicateError(field) {
 }
 
 module.exports = (err, req, res, next) => {
-  err.statusCode = err.statusCode || 500;
-
   if (err.name === 'JsonWebToken' || err.name === 'JsonWebTokenError')
     err = handleJWTError();
   if (err.name === 'TokenExpiredError') err = handleJWTExpiredError();
@@ -23,6 +21,7 @@ module.exports = (err, req, res, next) => {
     err = handleMongooseDuplicateError(...Object.keys(err.keyPattern));
 
   logger.error(err.message, err);
+  err.statusCode = err.statusCode || 500;
 
   if (err.statusCode === 500 && !(err instanceof AppError))
     err.message = 'Something went wrong.';
