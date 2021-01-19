@@ -2,7 +2,12 @@ const winston = require('winston');
 
 const logger = winston.createLogger({
   level: 'info',
-  format: winston.format.json(),
+  format: winston.format.combine(
+    winston.format.timestamp({
+      format: 'YYYY-MM-DD hh:mm:ss A ZZ',
+    }),
+    winston.format.json()
+  ),
   transports: [
     new winston.transports.File({ filename: process.env.LOG_FILE_NAME }),
   ],
