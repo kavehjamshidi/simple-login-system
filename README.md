@@ -28,7 +28,7 @@ Currently **ten** environment variables are required.
 - PORT: Port number
 - JWT_SECRET: A string used for signing JWTs. It is better for this string to be long (e.g. 32 characters).
 - DB_URI: [MongoDB connection URI](https://docs.mongodb.com/manual/reference/connection-string/).
-- REDIS_URI: Redis connection string.
+- REDIS_URI: Redis connection URI. (e.g. `redis://localhost:6379`).
 - LOG_FILE_NAME: Name of the file used by logger for logging errors and certain events.  
 In this project, SMTP is used for sending password reset emails, requiring a host, port, username, and password. The environment variables listed below are used for this purpose:  
 - EMAIL_HOST: Host of the SMTP service (e.g. `smtp.mailtrap.io`).  
