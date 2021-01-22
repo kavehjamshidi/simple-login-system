@@ -1,5 +1,5 @@
 # simple-login-system
-A simple token-based authentication and authorization system using Nodejs, Express, MongoDB, Redis, bcrypt, and JWT.  
+A simple token-based authentication and authorization REST API using Nodejs, Express, MongoDB, Redis, bcrypt, and JWT.  
 For authentication, access token and refresh token strategy is used. Access tokens are valid for only five minutes while refresh tokens are valid for seven days. User can retrieve new access and refresh tokens using the existing refresh token. The old refresh token is stored in a redis cache as blacklisted till it is expired.  
 Password reset functionality is available through sending a unique password reset URL to user's email. 
 
