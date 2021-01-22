@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const AppError = require('../utils/appError');
 
 const passwordRegExTest = function (password) {
@@ -59,8 +58,6 @@ const userSchema = new mongoose.Schema({
     validate: [validateConfirmPassword, 'Passwords do not match.'],
   },
   passwordChangeDate: Date,
-  passwordResetToken: String,
-  passwordResetExpired: Date,
 });
 
 userSchema.post('validate', createValidationError);
@@ -73,17 +70,6 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 
 userSchema.methods.changedPasswordAfterToken = function (JWTTimeStamp) {
   return this.passwordChangeDate.getTime() > 1000 * JWTTimeStamp;
-};
-
-userSchema.methods.createPasswordResetToken = function () {
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  this.passwordResetToken = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-  this.passwordResetExpired = Date.now() + 15 * 60 * 1000;
-
-  return resetToken;
 };
 
 const User = mongoose.model('user', userSchema);

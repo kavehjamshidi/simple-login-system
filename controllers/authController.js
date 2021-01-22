@@ -1,45 +1,47 @@
 const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
 const crypto = require('crypto');
+const validator = require('validator');
 const { User } = require('../models/userModel');
 const catchAsyncError = require('../middlewares/catchAsyncError');
 const AppError = require('../utils/appError');
 const sendEmail = require('../utils/email');
+const redisClient = require('../utils/cache');
 
-function signToken(id) {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRATION,
-  });
-}
-
-const cookieOptions = {
-  expires: new Date(
-    Date.now() + process.env.JWT_COOKIE_EXPIRATION * 24 * 60 * 60 * 1000
-  ),
-  httpOnly: true,
-};
-if (process.env.NODE_ENV === 'production') cookieOptions.secure = true;
+jwt.verify = promisify(jwt.verify);
 
 module.exports.signUp = catchAsyncError(async (req, res) => {
-  let newUser = await User.create({
+  let user = await User.create({
     username: req.body.username,
     email: req.body.email,
     password: req.body.password,
     confirmPassword: req.body.confirmPassword,
   });
 
-  const token = signToken(newUser._id);
+  const jwtid = crypto.randomBytes(16).toString('hex');
+  const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    issuer: 'access',
+    expiresIn: 300,
+    jwtid,
+  });
 
-  newUser = {
-    username: newUser.username,
-    email: newUser.email,
+  const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    issuer: 'refresh',
+    expiresIn: '7d',
+    jwtid,
+  });
+
+  user = {
+    username: user.username,
+    email: user.email,
   };
 
-  res.cookie('jwt', token, cookieOptions);
   return res.status(201).json({
     status: 'success',
     data: {
-      user: newUser,
+      user,
+      accessToken,
+      refreshToken,
     },
   });
 });
@@ -57,29 +59,49 @@ module.exports.login = catchAsyncError(async (req, res, next) => {
     return next(new AppError('Invalid username or password.', 401));
   }
 
-  const token = signToken(user._id);
+  const jwtid = crypto.randomBytes(16).toString('hex');
+  const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    issuer: 'access',
+    expiresIn: 300,
+    jwtid,
+  });
 
-  res.cookie('jwt', token, cookieOptions);
+  const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    issuer: 'refresh',
+    expiresIn: '7d',
+    jwtid,
+  });
+
   return res.status(200).json({
     status: 'success',
+    data: {
+      accessToken,
+      refreshToken,
+    },
   });
 });
 
 module.exports.protect = catchAsyncError(async (req, res, next) => {
-  const token = req.cookies.jwt;
-  if (!token) {
+  if (
+    !req.headers.authorization ||
+    !req.headers.authorization.startsWith('Bearer ')
+  ) {
     return next(new AppError('You are not logged in.', 401));
   }
 
-  const decodedPayload = await promisify(jwt.verify)(
-    token,
-    process.env.JWT_SECRET
-  );
+  const accessToken = req.headers.authorization.split(' ')[1];
 
-  const user = await User.findById(decodedPayload.id);
-  if (!user) return next(new AppError('The user no longer exists.', 401));
+  const payload = await jwt.verify(accessToken, process.env.JWT_SECRET, {
+    issuer: 'access',
+  });
 
-  if (user.changedPasswordAfterToken(decodedPayload.iat))
+  if (await redisClient.get(payload.jti))
+    return next(new AppError('Access forbidden.', 403));
+
+  const user = await User.findById(payload.id);
+  if (!user) return next(new AppError('User not found.', 401));
+
+  if (user.changedPasswordAfterToken(payload.iat))
     return next(
       new AppError('Login credentials have changed. Please login again.', 401)
     );
@@ -89,18 +111,71 @@ module.exports.protect = catchAsyncError(async (req, res, next) => {
   next();
 });
 
+module.exports.refresh = catchAsyncError(async (req, res, next) => {
+  if (
+    !req.headers.authorization ||
+    !req.headers.authorization.startsWith('Bearer ')
+  ) {
+    return next(new AppError('You are not logged in.', 401));
+  }
+
+  const refreshToken = req.headers.authorization.split(' ')[1];
+  const payload = await jwt.verify(refreshToken, process.env.JWT_SECRET, {
+    issuer: 'refresh',
+  });
+
+  if (await redisClient.get(payload.jti))
+    return next(new AppError('Access forbidden.', 403));
+
+  const user = await User.findById(payload.id);
+  if (!user) return next(new AppError('User not found.', 401));
+
+  if (user.changedPasswordAfterToken(payload.iat))
+    return next(
+      new AppError('Login credentials have changed. Please login again.', 401)
+    );
+
+  const jwtid = crypto.randomBytes(16).toString('hex');
+  const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    issuer: 'access',
+    expiresIn: 300,
+    jwtid,
+  });
+  const newRefreshToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    issuer: 'refresh',
+    expiresIn: '7d',
+    jwtid,
+  });
+
+  await redisClient.set(payload.jti, payload.id);
+  await redisClient.expire(
+    payload.jti,
+    payload.exp - parseInt(Date.now() / 1000, 10)
+  );
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      accessToken,
+      refreshToken: newRefreshToken,
+    },
+  });
+});
+
 module.exports.forgotPassword = catchAsyncError(async (req, res, next) => {
   const { email } = req.body;
   if (!email) {
     return next(new AppError('Please enter your email.', 400));
   }
 
+  if (!validator.isEmail(email))
+    return next(new AppError('Invalid email.', 400));
+
   const user = await User.findOne({ email });
   if (!user)
     return next(new AppError('No user found with the provided email.', 404));
 
-  const resetToken = user.createPasswordResetToken();
-  await user.save({ validateBeforeSave: false });
+  const resetToken = crypto.randomBytes(64).toString('hex');
 
   const resetUrl = `${req.protocol}://${req.get(
     'host'
@@ -121,6 +196,9 @@ module.exports.forgotPassword = catchAsyncError(async (req, res, next) => {
     );
   }
 
+  await redisClient.set(resetToken, email);
+  await redisClient.expire(email, 900);
+
   return res.status(200).json({
     status: 'success',
     message:
@@ -129,24 +207,19 @@ module.exports.forgotPassword = catchAsyncError(async (req, res, next) => {
 });
 
 module.exports.resetPassword = catchAsyncError(async (req, res, next) => {
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(req.params.token)
-    .digest('hex');
+  const email = await redisClient.get(req.params.token);
 
-  const user = await User.findOne({
-    passwordResetToken: hashedToken,
-    passwordResetExpired: { $gt: Date.now() },
-  });
+  if (!email) return next(new AppError('Invalid reset token.', 400));
 
-  if (!user) return next(new AppError('Invalid token.', 400));
+  const user = await User.findOne({ email });
+  if (!user) return next(new AppError('Invalid reset token.', 400));
 
-  user.passwordResetToken = undefined;
-  user.passwordResetExpired = undefined;
   user.password = req.body.password;
   user.confirmPassword = req.body.confirmPassword;
+  user.passwordChangeDate = new Date();
 
   await user.save();
+  await redisClient.del(req.params.token);
 
   return res.status(200).json({
     status: 'success',

@@ -1,20 +1,13 @@
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const app = require('../../app');
 const { User } = require('../../models/userModel');
-
-const prepareCookies = (res) => {
-  const re = new RegExp('; path=/; httponly', 'gi');
-  return res.headers['set-cookie']
-    .map(function (cookie) {
-      return cookie.replace(re, '');
-    })
-    .join('; ');
-};
+const redisClient = require('../../utils/cache');
 
 describe('Sample protected route', () => {
   describe('/sample-route', () => {
     let server;
-    let cookies;
+    let accessToken;
     beforeEach(async () => {
       server = app.listen(process.env.PORT || 3030);
       const res = await request(server).post('/user/signup').send({
@@ -23,7 +16,7 @@ describe('Sample protected route', () => {
         password: '12345Ab!',
         confirmPassword: '12345Ab!',
       });
-      cookies = prepareCookies(res);
+      ({ accessToken } = res.body.data);
     });
     afterEach(async () => {
       server.close();
@@ -31,7 +24,9 @@ describe('Sample protected route', () => {
     });
 
     const happyPath = () => {
-      return request(server).get('/sample-route').set('Cookie', cookies);
+      return request(server)
+        .get('/sample-route')
+        .set('Authorization', `Bearer ${accessToken}`);
     };
 
     it('should let user access the protected route', async () => {
@@ -46,8 +41,8 @@ describe('Sample protected route', () => {
       );
     });
 
-    it('should throw 401 if no jwt cookie', async () => {
-      cookies = '';
+    it('should throw 401 if no jwt token', async () => {
+      accessToken = '';
       const res = await happyPath();
 
       expect(res.status).toBe(401);
@@ -57,16 +52,13 @@ describe('Sample protected route', () => {
     });
 
     it('should throw 401 if jwt token is invalid', async () => {
-      cookies = 'jwt=123554;';
+      accessToken = 'jwt1234';
       const res = await happyPath();
 
       expect(res.status).toBe(401);
       expect(res.header['content-type']).toMatch(/json/);
       expect(res.body).toHaveProperty('status', 'error');
-      expect(res.body).toHaveProperty(
-        'message',
-        'Invalid token. Please login again.'
-      );
+      expect(res.body).toHaveProperty('message', 'Invalid token.');
     });
 
     it('should throw 401 if user no longer exists', async () => {
@@ -76,7 +68,7 @@ describe('Sample protected route', () => {
       expect(res.status).toBe(401);
       expect(res.header['content-type']).toMatch(/json/);
       expect(res.body).toHaveProperty('status', 'error');
-      expect(res.body).toHaveProperty('message', 'The user no longer exists.');
+      expect(res.body).toHaveProperty('message', 'User not found.');
     });
 
     it('should throw 401 if user credentials have changed after token had been issued', async () => {
@@ -93,6 +85,18 @@ describe('Sample protected route', () => {
         'message',
         'Login credentials have changed. Please login again.'
       );
+    });
+
+    it('should throw 403 if user in blacklist', async () => {
+      const payload = jwt.decode(accessToken);
+      await redisClient.set(payload.jti, payload.id);
+      const res = await happyPath();
+      await redisClient.del(payload.jti);
+
+      expect(res.status).toBe(403);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty('message', 'Access forbidden.');
     });
   });
 });

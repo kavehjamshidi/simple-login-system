@@ -49,7 +49,7 @@ describe('Error middleware', () => {
     expect(res.status(401).json).toBeCalledWith(
       expect.objectContaining({
         status: 'error',
-        message: 'Invalid token. Please login again.',
+        message: 'Invalid token.',
       })
     );
   });
@@ -64,7 +64,7 @@ describe('Error middleware', () => {
     expect(res.status(401).json).toBeCalledWith(
       expect.objectContaining({
         status: 'error',
-        message: 'Your token has expired. Please login again.',
+        message: 'Your token has expired.',
       })
     );
   });

@@ -175,17 +175,4 @@ describe('Document methods', () => {
       expect(result).toBe(false);
     });
   });
-
-  describe('createPasswordResetToken', () => {
-    it('should create password reset token and its expiry date', () => {
-      const resetToken = user.createPasswordResetToken();
-
-      expect(resetToken).toBeTruthy();
-      expect(user).toHaveProperty('passwordResetToken');
-      expect(user).toHaveProperty('passwordResetExpired');
-      expect(user.passwordResetExpired.getTime()).toBeLessThanOrEqual(
-        Date.now() + 15 * 60 * 1000
-      );
-    });
-  });
 });

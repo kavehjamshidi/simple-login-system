@@ -5,5 +5,6 @@ router.post('/signup', authController.signUp);
 router.post('/login', authController.login);
 router.post('/forgotPassword', authController.forgotPassword);
 router.post('/resetPassword/:token', authController.resetPassword);
+router.post('/refresh', authController.refresh);
 
 module.exports = router;

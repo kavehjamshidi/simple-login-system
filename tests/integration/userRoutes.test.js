@@ -1,7 +1,8 @@
 const request = require('supertest');
-const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const app = require('../../app');
 const { User } = require('../../models/userModel');
+const redisClient = require('../../utils/cache');
 
 describe('user routes', () => {
   let server;
@@ -38,13 +39,12 @@ describe('user routes', () => {
       expect(res.status).toBe(201);
       expect(res.header['content-type']).toMatch(/json/);
       expect(res.body).toHaveProperty('status', 'success');
-      expect(res.headers['set-cookie']).toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
       expect(res.body).toHaveProperty('data');
       expect(res.body.data).toHaveProperty('user');
       expect(res.body.data.user).toHaveProperty('username', 'test1');
       expect(res.body.data.user).toHaveProperty('email', 'test1@test.com');
+      expect(res.body.data).toHaveProperty('accessToken');
+      expect(res.body.data).toHaveProperty('refreshToken');
     });
 
     it('should throw an error if no username provided', async () => {
@@ -56,9 +56,7 @@ describe('user routes', () => {
       expect(res.body).toHaveProperty('status', 'error');
       expect(res.body).toHaveProperty('message');
       expect(res.body.message).toContain('Username is required.');
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if no email provided', async () => {
@@ -70,9 +68,7 @@ describe('user routes', () => {
       expect(res.body).toHaveProperty('status', 'error');
       expect(res.body).toHaveProperty('message');
       expect(res.body.message).toContain('Email is required.');
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if email is invalid', async () => {
@@ -84,9 +80,7 @@ describe('user routes', () => {
       expect(res.body).toHaveProperty('status', 'error');
       expect(res.body).toHaveProperty('message');
       expect(res.body.message).toContain('Invalid email.');
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if no password entered', async () => {
@@ -98,9 +92,7 @@ describe('user routes', () => {
       expect(res.body).toHaveProperty('status', 'error');
       expect(res.body).toHaveProperty('message');
       expect(res.body.message).toContain('Password is required.');
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if confirm password field is empty', async () => {
@@ -112,9 +104,7 @@ describe('user routes', () => {
       expect(res.body).toHaveProperty('status', 'error');
       expect(res.body).toHaveProperty('message');
       expect(res.body.message).toContain('Enter your password again.');
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if password does not meet the requirements', async () => {
@@ -128,9 +118,7 @@ describe('user routes', () => {
       expect(res.body.message).toContain(
         'Password should have at least eight characters containing at least one uppercase letter, one lowercase letter, one number, and one symbol.'
       );
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if password and confirmPassword do not match', async () => {
@@ -142,9 +130,7 @@ describe('user routes', () => {
       expect(res.body).toHaveProperty('status', 'error');
       expect(res.body).toHaveProperty('message');
       expect(res.body.message).toContain('Passwords do not match.');
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if username is not unique', async () => {
@@ -163,9 +149,7 @@ describe('user routes', () => {
       expect(res.body.message).toContain(
         'An account with this username already exists.'
       );
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw an error if email is not unique', async () => {
@@ -184,9 +168,7 @@ describe('user routes', () => {
       expect(res.body.message).toContain(
         'An account with this email already exists.'
       );
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
   });
 
@@ -221,9 +203,8 @@ describe('user routes', () => {
       expect(res.status).toBe(200);
       expect(res.header['content-type']).toMatch(/json/);
       expect(res.body).toHaveProperty('status', 'success');
-      expect(res.headers['set-cookie']).toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body.data).toHaveProperty('accessToken');
+      expect(res.body.data).toHaveProperty('refreshToken');
     });
 
     it('should throw 400 error if no username', async () => {
@@ -237,9 +218,7 @@ describe('user routes', () => {
         'message',
         'Please enter email and password.'
       );
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw 400 error if no password', async () => {
@@ -253,9 +232,7 @@ describe('user routes', () => {
         'message',
         'Please enter email and password.'
       );
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw 401 error if username is invalid', async () => {
@@ -269,9 +246,7 @@ describe('user routes', () => {
         'message',
         'Invalid username or password.'
       );
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
 
     it('should throw 401 error if password is invalid', async () => {
@@ -285,9 +260,7 @@ describe('user routes', () => {
         'message',
         'Invalid username or password.'
       );
-      expect(res.headers['set-cookie']).not.toEqual([
-        expect.stringMatching(/^jwt=/),
-      ]);
+      expect(res.body).not.toHaveProperty('data');
     });
   });
 
@@ -329,8 +302,17 @@ describe('user routes', () => {
       expect(res.body).toHaveProperty('message', 'Please enter your email.');
     });
 
-    it('should throw 404 if user with the provided email not found', async () => {
+    it('should throw 40 if email is invalid', async () => {
       email = '123';
+      const res = await happyPath();
+
+      expect(res.status).toBe(400);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty('message', 'Invalid email.');
+    });
+    it('should throw 404 if user with the provided email not found', async () => {
+      email = '123@test.com';
       const res = await happyPath();
 
       expect(res.status).toBe(404);
@@ -366,25 +348,24 @@ describe('user routes', () => {
     let username;
     let password;
     let confirmPassword;
-    let passwordResetExpired;
     beforeEach(async () => {
       token = 'abc';
       username = 'test1';
       password = 'Aa@12345';
       confirmPassword = 'Aa@12345';
-      passwordResetExpired = Date.now() + 15 * 1000 * 60;
-      const hashedToken = crypto
-        .createHash('sha256')
-        .update(token)
-        .digest('hex');
+
+      await redisClient.set(token, 'test1@test.com');
+      await redisClient.expire(token, 900);
       await User.create({
         username,
         email: 'test1@test.com',
         password,
         confirmPassword,
-        passwordResetToken: hashedToken,
-        passwordResetExpired,
       });
+    });
+
+    afterEach(async () => {
+      await redisClient.del(token);
     });
 
     const happyPath = () => {
@@ -406,8 +387,6 @@ describe('user routes', () => {
         'Password updated successfully. You can login with your new credentials.'
       );
       expect(user).toHaveProperty('password');
-      expect(user.passwordResetToken).toBe(undefined);
-      expect(user.passwordResetExpired).toBe(undefined);
     });
 
     it('should throw 400 if token is invalid', async () => {
@@ -417,21 +396,129 @@ describe('user routes', () => {
       expect(res.status).toBe(400);
       expect(res.header['content-type']).toMatch(/json/);
       expect(res.body).toHaveProperty('status', 'error');
-      expect(res.body).toHaveProperty('message', 'Invalid token.');
+      expect(res.body).toHaveProperty('message', 'Invalid reset token.');
     });
 
     it('should throw 400 if token is expired', async () => {
-      passwordResetExpired = Date.now() - 10000;
-      await User.findOneAndUpdate(
-        { username },
-        { $set: { passwordResetExpired } }
-      );
+      await redisClient.del(token);
       const res = await happyPath();
 
       expect(res.status).toBe(400);
       expect(res.header['content-type']).toMatch(/json/);
       expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty('message', 'Invalid reset token.');
+    });
+
+    it('should throw 400 if no user found', async () => {
+      await User.deleteMany();
+      const res = await happyPath();
+
+      expect(res.status).toBe(400);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty('message', 'Invalid reset token.');
+    });
+  });
+
+  describe('/refresh', () => {
+    let refreshToken;
+    let payload;
+    beforeEach(async () => {
+      const res = await request(server).post('/user/signup').send({
+        username: 'test2',
+        email: 'test2@test.com',
+        password: '12345Ab!',
+        confirmPassword: '12345Ab!',
+      });
+      ({ refreshToken } = res.body.data);
+      payload = jwt.decode(refreshToken, process.env.JWT_SECRET);
+    });
+
+    afterEach(async () => {
+      await redisClient.del(payload.jti);
+    });
+
+    const happyPath = () => {
+      return request(server)
+        .post('/user/refresh')
+        .set('Authorization', `Bearer ${refreshToken}`);
+    };
+
+    it('should receive new refresh and access tokens', async () => {
+      const res = await happyPath();
+
+      expect(res.status).toBe(200);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'success');
+      expect(res.body.data).toHaveProperty('accessToken');
+      expect(res.body.data).toHaveProperty('refreshToken');
+
+      expect(await redisClient.get(payload.jti)).toBe(payload.id);
+      expect(await redisClient.ttl(payload.jti)).toBeLessThanOrEqual(
+        payload.exp - parseInt(Date.now() / 1000, 10)
+      );
+    });
+
+    it('should return 401 if no refresh token', async () => {
+      refreshToken = '';
+      const res = await happyPath();
+
+      expect(res.status).toBe(401);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty('message', 'You are not logged in.');
+      expect(res.body).not.toHaveProperty('data');
+    });
+
+    it('should return 400 if refresh token is invalid', async () => {
+      refreshToken = 'jwt1234';
+      const res = await happyPath();
+
+      expect(res.status).toBe(401);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
       expect(res.body).toHaveProperty('message', 'Invalid token.');
+      expect(res.body).not.toHaveProperty('data');
+    });
+
+    it('should return 401 if no user found', async () => {
+      await User.deleteMany();
+      const res = await happyPath();
+
+      expect(res.status).toBe(401);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty('message', 'User not found.');
+      expect(res.body).not.toHaveProperty('data');
+    });
+
+    it('should return 401 if login credentials have changed', async () => {
+      await User.findOneAndUpdate(
+        { username: 'test2' },
+        { $set: { passwordChangeDate: Date.now() + 10000 } }
+      );
+      const res = await happyPath();
+
+      expect(res.status).toBe(401);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty(
+        'message',
+        'Login credentials have changed. Please login again.'
+      );
+      expect(res.body).not.toHaveProperty('data');
+    });
+
+    it('should return 403 if user in blacklist', async () => {
+      await redisClient.set(payload.jti, payload.id);
+      const res = await happyPath();
+      await redisClient.del(payload.jti);
+
+      expect(res.status).toBe(403);
+      expect(res.header['content-type']).toMatch(/json/);
+      expect(res.body).toHaveProperty('status', 'error');
+      expect(res.body).toHaveProperty('message', 'Access forbidden.');
+      expect(res.body).not.toHaveProperty('data');
     });
   });
 });

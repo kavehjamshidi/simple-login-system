@@ -2,11 +2,11 @@ const AppError = require('../utils/appError');
 const logger = require('../utils/logger');
 
 function handleJWTError() {
-  return new AppError('Invalid token. Please login again.', 401);
+  return new AppError('Invalid token.', 401);
 }
 
 function handleJWTExpiredError() {
-  return new AppError('Your token has expired. Please login again.', 401);
+  return new AppError('Your token has expired.', 401);
 }
 
 function handleMongooseDuplicateError(field) {
