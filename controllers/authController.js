@@ -192,7 +192,7 @@ module.exports.forgotPassword = catchAsyncError(async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     return next(
-      new AppError('There was an error sending the email. Try again later', 500)
+      new AppError('There was an error sending the email. Try again later', 502)
     );
   }
 
